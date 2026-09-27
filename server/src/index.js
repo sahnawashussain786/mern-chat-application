@@ -7,6 +7,7 @@ import { Server } from 'socket.io'
 import { CLERK_PUBLISHABLE_KEY, CLIENT_ORIGIN, PORT, isProd } from './config.js'
 import { connectDB, disconnectDB } from './db.js'
 import { authRouter } from './routes/auth.js'
+import { friendsRouter } from './routes/friends.js'
 import { roomsRouter } from './routes/rooms.js'
 import { webhookRouter, expressRawBody } from './routes/webhook.js'
 import { registerChatNamespace } from './socket/index.js'
@@ -32,6 +33,7 @@ app.get('/api/health', (req, res) => {
 })
 
 app.use('/api/auth', authRouter)
+app.use('/api/friends', friendsRouter)
 app.use('/api/rooms', roomsRouter)
 
 app.use('/api', (req, res) => {

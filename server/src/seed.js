@@ -7,8 +7,8 @@ const DEFAULT_ROOMS = [
 ]
 
 export async function seedDefaultRooms() {
-  const count = await Room.countDocuments()
+  const count = await Room.countDocuments({ kind: { $ne: 'dm' } })
   if (count > 0) return
-  await Room.insertMany(DEFAULT_ROOMS)
+  await Room.insertMany(DEFAULT_ROOMS.map((r) => ({ ...r, kind: 'channel' })))
   console.log(`✓ Seeded ${DEFAULT_ROOMS.length} default rooms`)
 }

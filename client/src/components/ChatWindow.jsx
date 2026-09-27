@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import MessageItem from './MessageItem'
+import { Avatar } from './Sidebar'
 import { api } from '../lib/api'
 
 function dayLabel(ts) {
@@ -89,6 +90,9 @@ export default function ChatWindow({
     )
   }
 
+  const isDM = room.kind === 'dm'
+  const dmUser = room.dmUser ?? null
+
   // Group consecutive messages by sender within the same day
   const groups = []
   for (const m of messages) {
@@ -103,14 +107,24 @@ export default function ChatWindow({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {/* Room header */}
+      {/* Room / DM header */}
       <header className="flex items-center gap-3 border-b border-white/5 bg-slate-900/40 px-6 py-3.5 backdrop-blur">
-        <span className="text-xl font-bold text-indigo-400">#</span>
+        {isDM ? (
+          <Avatar url={dmUser?.avatarUrl} name={dmUser?.displayName} />
+        ) : (
+          <span className="text-xl font-bold text-indigo-400">#</span>
+        )}
         <div className="min-w-0 flex-1">
-          <h2 className="truncate text-sm font-semibold text-white">{room.name}</h2>
-          {room.topic && <p className="truncate text-xs text-slate-500">{room.topic}</p>}
+          <h2 className="truncate text-sm font-semibold text-white">
+            {isDM ? dmUser?.displayName ?? 'Direct message' : room.name}
+          </h2>
+          {isDM ? (
+            <p className="truncate text-xs text-slate-500">@{dmUser?.username}</p>
+          ) : (
+            room.topic && <p className="truncate text-xs text-slate-500">{room.topic}</p>
+          )}
         </div>
-        {room.isPrivate && (
+        {!isDM && room.isPrivate && (
           <span className="flex items-center gap-1 rounded-full bg-amber-500/10 px-2.5 py-1 text-[11px] font-medium text-amber-300 ring-1 ring-amber-400/20">
             <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
@@ -137,9 +151,18 @@ export default function ChatWindow({
 
         {messages.length === 0 && (
           <div className="flex h-full flex-col items-center justify-center text-center">
-            <p className="animate-float text-5xl">👋</p>
+            <p className="animate-float text-5xl">{isDM ? '💬' : '👋'}</p>
             <p className="mt-3 text-sm text-slate-400">
-              This is the start of <span className="font-semibold text-slate-200">#{room.name}</span>
+              {isDM ? (
+                <>
+                  This is your DM with{' '}
+                  <span className="font-semibold text-slate-200">{dmUser?.displayName}</span>
+                </>
+              ) : (
+                <>
+                  This is the start of <span className="font-semibold text-slate-200">#{room.name}</span>
+                </>
+              )}
             </p>
             <p className="text-xs text-slate-600">Send a message to get things going.</p>
           </div>

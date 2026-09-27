@@ -32,6 +32,14 @@ export const api = {
   joinRoom: (id) => request(`/rooms/${id}/join`, { method: 'POST' }),
   messages: (roomId, before) =>
     request(`/rooms/${roomId}/messages${before ? `?before=${encodeURIComponent(before)}` : ''}`),
+  // Friends & DMs
+  friends: () => request('/friends'),
+  searchUsers: (q) => request(`/friends/search?q=${encodeURIComponent(q)}`),
+  sendFriendRequest: (username) => request('/friends/requests', { method: 'POST', body: { username } }),
+  acceptFriendRequest: (requestId) => request(`/friends/requests/${requestId}/accept`, { method: 'POST' }),
+  declineFriendRequest: (requestId) => request(`/friends/requests/${requestId}`, { method: 'DELETE' }),
+  removeFriend: (userId) => request(`/friends/${userId}`, { method: 'DELETE' }),
+  openDM: (userId) => request(`/friends/${userId}/dm`),
 }
 
 export { API_URL }

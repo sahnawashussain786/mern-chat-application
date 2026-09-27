@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { UserButton } from '@clerk/react'
 import { useAuth } from '../context/useAuth'
 import { api } from '../lib/api'
+import FriendsPanel from './FriendsPanel'
 
 export default function Sidebar({
   rooms,
@@ -10,8 +11,12 @@ export default function Sidebar({
   onCreateRoom,
   onlineUsers,
   unread,
+  friendsData,
+  onOpenDM,
+  onFriendsChanged,
 }) {
   const { logout } = useAuth()
+  const [tab, setTab] = useState('rooms') // 'rooms' | 'friends'
   const [creating, setCreating] = useState(false)
   const [name, setName] = useState('')
   const [isPrivate, setIsPrivate] = useState(false)
@@ -20,9 +25,15 @@ export default function Sidebar({
   const [filter, setFilter] = useState('')
 
   const filteredRooms = useMemo(
-    () => rooms.filter((r) => r.name.toLowerCase().includes(filter.toLowerCase())),
+    () =>
+      rooms.filter((r) => {
+        const label = (r.kind === 'dm' ? r.dmUser?.displayName ?? '' : r.name).toLowerCase()
+        return label.includes(filter.toLowerCase())
+      }),
     [rooms, filter],
   )
+
+  const incomingCount = friendsData?.incoming?.length ?? 0
 
   async function handleCreate(e) {
     e.preventDefault()
@@ -37,7 +48,7 @@ export default function Sidebar({
       setCreating(false)
     } catch (err) {
       setError(err.message)
-    }  finally {
+    } finally {
       setBusy(false)
     }
   }
@@ -61,110 +72,163 @@ export default function Sidebar({
         <UserButton afterSignOutUrl="/login" />
       </div>
 
-      {/* Room search + new room */}
+      {/* Tabs */}
       <div className="flex items-center gap-2 px-3 pt-3">
-        <div className="relative flex-1">
-          <svg className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
-          </svg>
-          <input
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            placeholder="Search rooms"
-            className="w-full rounded-lg border-0 bg-slate-800/70 py-1.5 pl-8 pr-3 text-xs text-white placeholder-slate-500 ring-1 ring-white/10 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          />
-        </div>
         <button
           type="button"
-          onClick={() => setCreating((v) => !v)}
-          className="rounded-lg bg-indigo-500/15 p-1.5 text-indigo-400 ring-1 ring-indigo-400/20 transition hover:bg-indigo-500/25"
-          title="New room"
+          onClick={() => setTab('rooms')}
+          className={`flex-1 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+            tab === 'rooms'
+              ? 'bg-indigo-500/15 text-indigo-300 ring-1 ring-indigo-400/30'
+              : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'
+          }`}
         >
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-          </svg>
+          Rooms
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab('friends')}
+          className={`relative flex-1 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+            tab === 'friends'
+              ? 'bg-indigo-500/15 text-indigo-300 ring-1 ring-indigo-400/30'
+              : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'
+          }`}
+        >
+          Friends
+          {incomingCount > 0 && (
+            <span className="absolute -top-1.5 -right-1.5 min-w-[18px] rounded-full bg-indigo-500 px-1 py-0.5 text-center text-[10px] font-bold text-white">
+              {incomingCount}
+            </span>
+          )}
         </button>
       </div>
 
-      {/* Create form */}
-      {creating && (
-        <form onSubmit={handleCreate} className="px-3 pb-2 pt-2">
-          <input
-            autoFocus
-            value={name}
-            onChange={(e) => {
-              setName(e.target.value)
-              setError('')
-            }}
-            placeholder="room-name"
-            className="w-full rounded-lg border-0 bg-slate-800 px-3 py-2 text-sm text-white placeholder-slate-500 ring-1 ring-white/10 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          />
-          <label className="mt-2 flex cursor-pointer items-center gap-2 text-xs text-slate-400">
-            <input
-              type="checkbox"
-              checked={isPrivate}
-              onChange={(e) => setIsPrivate(e.target.checked)}
-              className="h-3.5 w-3.5 rounded accent-indigo-500"
-            />
-            Private room (invite-only)
-          </label>
-          {error && <p className="mt-1 text-xs text-rose-400">{error}</p>}
-        </form>
+      {tab === 'rooms' && (
+        <>
+          {/* Room search + new room */}
+          <div className="flex items-center gap-2 px-3 pt-3">
+            <div className="relative flex-1">
+              <svg className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+              </svg>
+              <input
+                value={filter}
+                onChange={(e) => setFilter(e.target.value)}
+                placeholder="Search rooms"
+                className="w-full rounded-lg border-0 bg-slate-800/70 py-1.5 pl-8 pr-3 text-xs text-white placeholder-slate-500 ring-1 ring-white/10 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => setCreating((v) => !v)}
+              className="rounded-lg bg-indigo-500/15 p-1.5 text-indigo-400 ring-1 ring-indigo-400/20 transition hover:bg-indigo-500/25"
+              title="New room"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Create form */}
+          {creating && (
+            <form onSubmit={handleCreate} className="px-3 pb-2 pt-2">
+              <input
+                autoFocus
+                value={name}
+                onChange={(e) => {
+                  setName(e.target.value)
+                  setError('')
+                }}
+                placeholder="room-name"
+                className="w-full rounded-lg border-0 bg-slate-800 px-3 py-2 text-sm text-white placeholder-slate-500 ring-1 ring-white/10 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+              <label className="mt-2 flex cursor-pointer items-center gap-2 text-xs text-slate-400">
+                <input
+                  type="checkbox"
+                  checked={isPrivate}
+                  onChange={(e) => setIsPrivate(e.target.checked)}
+                  className="h-3.5 w-3.5 rounded accent-indigo-500"
+                />
+                Private room (invite-only)
+              </label>
+              {error && <p className="mt-1 text-xs text-rose-400">{error}</p>}
+            </form>
+          )}
+
+          {/* Room list */}
+          <nav className="mt-2 min-h-0 flex-1 space-y-0.5 overflow-y-auto px-2 pb-2">
+            {filteredRooms.map((room) => {
+              const active = activeRoom?.id === room.id
+              const count = unread[room.id] ?? 0
+              const isDM = room.kind === 'dm'
+              return (
+                <button
+                  key={room.id}
+                  type="button"
+                  onClick={() => onJoinRoom(room)}
+                  className={`group flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm transition ${
+                    active
+                      ? 'bg-indigo-500/15 text-white ring-1 ring-indigo-400/30'
+                      : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'
+                  }`}
+                >
+                  {isDM ? (
+                    <Avatar url={room.dmUser?.avatarUrl} name={room.dmUser?.displayName} size={6} />
+                  ) : (
+                    <span className={active ? 'text-indigo-400' : 'text-slate-600'}>#</span>
+                  )}
+                  <span className="flex-1 truncate font-medium">
+                    {isDM ? room.dmUser?.displayName ?? 'Direct message' : room.name}
+                  </span>
+                  {!isDM && room.isPrivate && (
+                    <svg className="h-3.5 w-3.5 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                    </svg>
+                  )}
+                  {count > 0 && (
+                    <span className="min-w-[20px] rounded-full bg-indigo-500 px-1.5 py-0.5 text-center text-[10px] font-bold text-white">
+                      {count > 99 ? '99+' : count}
+                    </span>
+                  )}
+                </button>
+              )
+            })}
+            {filteredRooms.length === 0 && (
+              <p className="px-3 py-2 text-sm text-slate-500">No rooms found.</p>
+            )}
+          </nav>
+        </>
       )}
 
-      {/* Room list */}
-      <nav className="mt-2 flex-1 space-y-0.5 overflow-y-auto px-2 pb-2">
-        {filteredRooms.map((room) => {
-          const active = activeRoom?.id === room.id
-          const count = unread[room.id] ?? 0
-          return (
-            <button
-              key={room.id}
-              type="button"
-              onClick={() => onJoinRoom(room)}
-              className={`group flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm transition ${
-                active
-                  ? 'bg-indigo-500/15 text-white ring-1 ring-indigo-400/30'
-                  : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'
-              }`}
-            >
-              <span className={active ? 'text-indigo-400' : 'text-slate-600'}>#</span>
-              <span className="flex-1 truncate font-medium">{room.name}</span>
-              {room.isPrivate && (
-                <svg className="h-3.5 w-3.5 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
-                </svg>
-              )}
-              {count > 0 && (
-                <span className="min-w-[20px] rounded-full bg-indigo-500 px-1.5 py-0.5 text-center text-[10px] font-bold text-white">
-                  {count > 99 ? '99+' : count}
-                </span>
-              )}
-            </button>
-          )
-        })}
-        {filteredRooms.length === 0 && (
-          <p className="px-3 py-2 text-sm text-slate-500">No rooms found.</p>
-        )}
-      </nav>
+      {tab === 'friends' && (
+        <FriendsPanel
+          friendsData={friendsData}
+          onlineUsers={onlineUsers}
+          onOpenDM={onOpenDM}
+          onChanged={onFriendsChanged}
+        />
+      )}
 
       {/* Online users */}
-      <div className="border-t border-white/5 px-4 py-3">
-        <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-          Online — {onlineUsers.length}
-        </p>
-        <ul className="max-h-28 space-y-1.5 overflow-y-auto">
-          {onlineUsers.map((u) => (
-            <li key={u.id} className="flex items-center gap-2 text-sm text-slate-300">
-              <Avatar url={u.avatarUrl} name={u.displayName} size={6} />
-              <span className="truncate">{u.displayName}</span>
-            </li>
-          ))}
-          {onlineUsers.length === 0 && (
-            <li className="text-xs text-slate-600">Nobody here yet…</li>
-          )}
-        </ul>
-      </div>
+      {tab === 'rooms' && (
+        <div className="border-t border-white/5 px-4 py-3">
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+            Online — {onlineUsers.length}
+          </p>
+          <ul className="max-h-28 space-y-1.5 overflow-y-auto">
+            {onlineUsers.map((u) => (
+              <li key={u.id} className="flex items-center gap-2 text-sm text-slate-300">
+                <Avatar url={u.avatarUrl} name={u.displayName} size={6} />
+                <span className="truncate">{u.displayName}</span>
+              </li>
+            ))}
+            {onlineUsers.length === 0 && (
+              <li className="text-xs text-slate-600">Nobody here yet…</li>
+            )}
+          </ul>
+        </div>
+      )}
 
       {/* Connection status footer */}
       <div className="flex items-center justify-between border-t border-white/5 px-4 py-2">

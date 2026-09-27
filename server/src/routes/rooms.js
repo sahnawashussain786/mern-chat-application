@@ -23,9 +23,32 @@ roomsRouter.get('/', async (req, res, next) => {
   try {
     const rooms = await Room.find({
       $or: [{ isPrivate: false }, { members: req.localUser._id }],
+      kind: { $ne: 'dm' },
     }).sort({ isPrivate: 1, name: 1 })
 
-    res.json({ rooms: rooms.map((r) => r.toSafeJSON()) })
+    // The user's DM conversations, with the friend's identity for display
+    const dmRooms = await Room.find({ kind: 'dm', members: req.localUser._id }).populate(
+      'members',
+      'username displayName avatarUrl',
+    )
+
+    res.json({
+      rooms: rooms.map((r) => r.toSafeJSON()),
+      dmRooms: dmRooms.map((r) => {
+        const friend = r.members.find((m) => !m._id.equals(req.localUser._id))
+        return {
+          ...r.toSafeJSON(),
+          dmUser: friend
+            ? {
+                id: friend._id.toString(),
+                username: friend.username,
+                displayName: friend.displayName,
+                avatarUrl: friend.avatarUrl,
+              }
+            : null,
+        }
+      }),
+    })
   } catch (err) {
     next(err)
   }

@@ -7,6 +7,17 @@ import { resolveUser } from '../auth/clerk.js'
 // clerkId → Set of socket ids
 const online = new Map()
 
+let ioRef = null
+
+// Emit an event to every socket of a user (by clerkId), e.g. friend notifications
+export function emitToClerk(clerkId, event, payload) {
+  const sockets = online.get(clerkId)
+  if (!ioRef || !sockets) return
+  for (const socketId of sockets) {
+    ioRef.to(socketId).emit(event, payload)
+  }
+}
+
 function broadcastPresence(io) {
   const ids = [...online.keys()]
   User.find({ clerkId: { $in: ids } })
@@ -55,6 +66,8 @@ async function emitUpdatedMessage(io, msg) {
 }
 
 export function registerChatNamespace(io) {
+  ioRef = io
+
   // Handshake authentication via Clerk session token
   io.use(async (socket, next) => {
     try {
@@ -156,7 +169,20 @@ export function registerChatNamespace(io) {
           },
         ])
 
-        io.to(roomKey(roomId)).emit('message:new', { message: doc.toSafeJSON() })
+        const payload = { message: doc.toSafeJSON() }
+
+        // DM rooms carry their participants so each client can identify the friend
+        if (room.kind === 'dm') {
+          await room.populate('members', 'username displayName avatarUrl')
+          payload.dmMembers = room.members.map((u) => ({
+            id: u._id.toString(),
+            username: u.username,
+            displayName: u.displayName,
+            avatarUrl: u.avatarUrl,
+          }))
+        }
+
+        io.to(roomKey(roomId)).emit('message:new', payload)
         callback({ ok: true, message: doc.toSafeJSON() })
       } catch (err) {
         callback({ error: err.message ?? 'Failed to send message' })

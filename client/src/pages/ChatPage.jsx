@@ -19,6 +19,7 @@ export default function ChatPage() {
   const [unread, setUnread] = useState({}) // roomId → count
   const [replyTo, setReplyTo] = useState(null)
   const [connected, setConnected] = useState(false)
+  const [friends, setFriends] = useState({ friends: [], incoming: [], outgoing: [] })
   const activeRoomRef = useRef(null)
   const socketRef = useRef(null)
 
@@ -40,16 +41,28 @@ export default function ChatPage() {
     })
   }, [])
 
-  // Load rooms
+  // Load rooms + existing DM conversations
   useEffect(() => {
     api
       .rooms()
       .then((data) => {
-        setRooms(data.rooms)
+        setRooms([...(data.dmRooms ?? []), ...data.rooms])
         if (data.rooms.length > 0) setActiveRoom((cur) => cur ?? data.rooms[0])
       })
       .catch(() => {})
   }, [])
+
+  // Load friends + requests
+  const refreshFriends = useCallback(() => {
+    api
+      .friends()
+      .then(setFriends)
+      .catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    refreshFriends()
+  }, [refreshFriends])
 
   // Socket lifecycle
   useEffect(() => {
@@ -62,7 +75,18 @@ export default function ChatPage() {
 
     const onPresence = ({ online }) => setOnlineUsers(online)
 
-    const onMessageNew = ({ message }) => {
+    const onMessageNew = ({ message, dmMembers }) => {
+      // A DM arriving in a room we haven't opened yet — surface it in the sidebar
+      if (dmMembers) {
+        const friend = dmMembers.find((m) => m.id !== user.id)
+        if (friend) {
+          setRooms((prev) => {
+            if (prev.some((r) => r.id === message.roomId)) return prev
+            return [{ id: message.roomId, kind: 'dm', name: 'dm', isPrivate: true, dmUser: friend }, ...prev]
+          })
+        }
+      }
+
       if (message.roomId === activeRoomRef.current?.id) {
         setMessages((prev) => {
           if (prev.some((m) => m.id === message.id)) return prev
@@ -71,6 +95,14 @@ export default function ChatPage() {
       } else {
         bumpUnread(message.roomId)
       }
+    }
+
+    const onFriendsUpdate = (payload) => {
+      setFriends({
+        friends: payload.friends ?? [],
+        incoming: payload.incoming ?? [],
+        outgoing: payload.outgoing ?? [],
+      })
     }
 
     const onMessageUpdated = ({ message }) => {
@@ -92,6 +124,7 @@ export default function ChatPage() {
     socket.on('message:new', onMessageNew)
     socket.on('message:updated', onMessageUpdated)
     socket.on('typing', onTyping)
+    socket.on('friends:update', onFriendsUpdate)
 
     socket.connect()
 
@@ -102,6 +135,7 @@ export default function ChatPage() {
       socket.off('message:new', onMessageNew)
       socket.off('message:updated', onMessageUpdated)
       socket.off('typing', onTyping)
+      socket.off('friends:update', onFriendsUpdate)
       socket.disconnect()
     }
   }, [user, bumpUnread, clearUnread])
@@ -146,6 +180,15 @@ export default function ChatPage() {
     [clearUnread],
   )
 
+  // Open (or focus) a 1:1 DM with a friend
+  const openDM = useCallback(
+    (room) => {
+      setRooms((prev) => (prev.some((r) => r.id === room.id) ? prev : [room, ...prev]))
+      joinRoom(room)
+    },
+    [joinRoom],
+  )
+
   const handleReact = useCallback((m, emoji) => {
     socketRef.current?.emit('message:react', { messageId: m.id, emoji })
   }, [])
@@ -182,6 +225,9 @@ export default function ChatPage() {
         }}
         onlineUsers={onlineUsers}
         unread={unread}
+        friendsData={friends}
+        onOpenDM={openDM}
+        onFriendsChanged={refreshFriends}
       />
       <main className="flex min-w-0 flex-1 flex-col">
         {!connected && <ConnectionBanner connected={connected} />}
