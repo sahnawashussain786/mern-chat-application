@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
-import { JWT_EXPIRES_IN_DAYS, JWT_SECRET } from '../config.js'
+import { JWT_EXPIRES_IN_DAYS, JWT_SECRET } from './config.js'
 
 const SALT_ROUNDS = 10
 

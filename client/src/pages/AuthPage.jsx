@@ -1,6 +1,5 @@
-import { useEffect, useState } from 'react'
-import { useAuth } from '../context/AuthContext'
-import { api } from '../lib/api'
+import { useState } from 'react'
+import { useAuth } from '../context/useAuth'
 
 const DEMO_USERS = [
   { username: 'alice', displayName: 'Alice', password: 'password123' },
@@ -174,6 +173,3 @@ function Field({ label, value, onChange, error, type = 'text', placeholder, auto
     </label>
   )
 }
-
-// keep api import used for potential future onboarding calls
-void api

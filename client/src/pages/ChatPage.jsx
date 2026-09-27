@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import Sidebar from '../components/Sidebar'
 import ChatWindow from '../components/ChatWindow'
 import MessageInput from '../components/MessageInput'
-import { useAuth } from '../context/AuthContext'
+import { useAuth } from '../context/useAuth'
 import { api } from '../lib/api'
 import { getSocket } from '../lib/socket'
 
@@ -19,7 +19,9 @@ export default function ChatPage() {
   const activeRoomRef = useRef(null)
   const socketRef = useRef(null)
 
-  activeRoomRef.current = activeRoom
+  useEffect(() => {
+    activeRoomRef.current = activeRoom
+  }, [activeRoom])
 
   // Load rooms once
   useEffect(() => {

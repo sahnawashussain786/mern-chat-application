@@ -19,35 +19,23 @@ function dayLabel(ts) {
 export default function ChatWindow({ room, user, messages, setMessages, typingUsers }) {
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMore, setHasMore] = useState(false)
-  const scrollRef = useRef(null)
   const bottomRef = useRef(null)
-  const prevCountRef = useRef(0)
+  const lastMsgId = messages.length > 0 ? messages[messages.length - 1].id : null
 
   const scrollToBottom = useCallback((behavior = 'smooth') => {
     bottomRef.current?.scrollIntoView({ behavior, block: 'end' })
   }, [])
 
-  // Reset state when switching rooms
+  // Scroll to bottom when the latest message changes (new message or room switch).
+  // Prepending older messages leaves lastMsgId unchanged, so position is preserved.
   useEffect(() => {
-    prevCountRef.current = 0
-    setHasMore(false)
-    scrollToBottom('auto')
-  }, [room?.id, scrollToBottom])
-
-  // Auto-scroll when new messages arrive
-  useEffect(() => {
-    if (messages.length !== prevCountRef.current) {
-      const prev = prevCountRef.current
-      prevCountRef.current = messages.length
-      if (messages.length > prev) scrollToBottom('smooth')
-    }
-  }, [messages.length, scrollToBottom])
+    if (lastMsgId) scrollToBottom('smooth')
+  }, [lastMsgId, scrollToBottom])
 
   // Load history when a room is selected
   useEffect(() => {
     if (!room) return
     let cancelled = false
-    setHasMore(false)
     api
       .messages(room.id)
       .then((data) => {
@@ -55,11 +43,15 @@ export default function ChatWindow({ room, user, messages, setMessages, typingUs
         setMessages(data.messages)
         setHasMore(data.hasMore)
       })
-      .catch(() => setMessages([]))
+      .catch(() => {
+        if (cancelled) return
+        setMessages([])
+        setHasMore(false)
+      })
     return () => {
       cancelled = true
     }
-  }, [room?.id, setMessages])
+  }, [room, setMessages])
 
   async function loadOlder() {
     if (!room || loadingMore || messages.length === 0) return
@@ -98,7 +90,7 @@ export default function ChatWindow({ room, user, messages, setMessages, typingUs
     const last = groups[groups.length - 1]
     const sameDay = last && new Date(last.ts).toDateString() === new Date(m.createdAt).toDateString()
     if (!last || !sameDay || last.senderId !== m.sender.id) {
-      groups.push({ ts: m.createdAt, senderId: m.sender.id, sender: m.sender, items: [m] })
+      groups.push({ ts: m.createdAt, senderId: m.sender.id, items: [m] })
     } else {
       last.items.push(m)
     }
@@ -116,7 +108,7 @@ export default function ChatWindow({ room, user, messages, setMessages, typingUs
       </header>
 
       {/* Messages */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 sm:px-6 py-4">
+      <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4">
         {hasMore && (
           <div className="mb-4 text-center">
             <button
@@ -160,7 +152,7 @@ export default function ChatWindow({ room, user, messages, setMessages, typingUs
                         }`}
                       >
                         {m.sender.displayName.charAt(0).toUpperCase()}
-                        </div>
+                      </div>
                     )}
                   </div>
                   <div className={`max-w-[75%] ${mine ? 'items-end text-right' : ''}`}>
