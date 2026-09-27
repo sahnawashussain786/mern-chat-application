@@ -83,6 +83,19 @@ if /I "%~1"=="check" (
 )
 
 rem ---------- 4. Dependencies ----------
+rem Root node_modules holds "concurrently", needed by "npm run dev"
+if not exist "node_modules\concurrently" (
+    echo  [..] Installing root dependencies (concurrently)...
+    call npm install
+    if errorlevel 1 (
+        echo  [ERROR] npm install failed at root.
+        pause
+        exit /b 1
+    )
+) else (
+    echo  [OK] Root dependencies installed.
+)
+
 if not exist "server\node_modules" (
     echo  [..] Installing server dependencies - first run only...
     pushd server
@@ -141,7 +154,7 @@ if "!NEEDS_KEYS!"=="1" (
     echo        VITE_CLERK_PUBLISHABLE_KEY=pk_test_...
     echo   3. Paste the Secret key into server\.env
     echo        CLERK_SECRET_KEY=sk_test_...
-    echo   4. Close both app windows and run start.bat again.
+    echo   4. Close the ChatFlow window and run start.bat again.
     echo.
     echo   The app will still try to start, but sign-in will not
     echo   work until the real keys are added.
@@ -150,19 +163,34 @@ if "!NEEDS_KEYS!"=="1" (
 
 rem ---------- 7. Launch ----------
 echo.
-echo  [..] Starting API + Socket.IO server  (window: ChatFlow Server)...
-pushd "%~dp0server"
-start "ChatFlow Server" cmd /k "npm run dev"
+echo  [..] Starting server + client together (one window, prefixed logs ^[server] / ^[client]^)...
+pushd "%~dp0"
+start "ChatFlow" cmd /k "npm run dev"
 popd
 
-echo  [..] Starting Vite client             (window: ChatFlow Client)...
-pushd "%~dp0client"
-start "ChatFlow Client" cmd /k "npm run dev"
-popd
+echo  [..] Waiting for the API to come up (first run can take a minute)...
+set /a TRIES=0
+:wait_api
+curl -s -o nul -m 2 http://localhost:5000/api/health >nul 2>nul
+if not errorlevel 1 goto api_ok
+set /a TRIES+=1
+if %TRIES% GEQ 20 goto api_fail
+timeout /t 2 /nobreak >nul
+goto wait_api
 
-echo  [..] Waiting for the dev servers to boot...
-timeout /t 5 /nobreak >nul
+:api_ok
+echo  [OK] API is up and healthy on port 5000.
 start "" http://localhost:5173
+goto launch_done
+
+:api_fail
+echo  [WARN] API did not respond within 40 seconds.
+echo         Check the "ChatFlow" window for the actual error
+echo         ^(Clerk keys missing? MongoDB unreachable?^). Opening the
+echo         browser anyway so you can read any on-screen guidance.
+start "" http://localhost:5173
+
+:launch_done
 
 echo.
 echo  ============================================
@@ -171,8 +199,7 @@ echo.
 echo    Chat app : http://localhost:5173
 echo    API      : http://localhost:5000/api/health
 echo.
-echo    To stop: close the ChatFlow Server and
-echo    ChatFlow Client windows (or Ctrl+C in them).
+echo    To stop: close the ChatFlow window (or Ctrl+C in it).
 echo  ============================================
 echo.
 timeout /t 8 /nobreak >nul

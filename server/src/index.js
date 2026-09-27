@@ -45,6 +45,19 @@ app.use((err, req, res, next) => {
 })
 
 const httpServer = createServer(app)
+
+// Friendly message when port 5000 is already taken (e.g. duplicate server window)
+httpServer.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(
+      `✗ Port ${PORT} is already in use. Another ChatFlow server window is probably running.\n` +
+        '  Close the old "ChatFlow Server" window (or run: netstat -ano | findstr :5000), then try again.',
+    )
+    process.exit(1)
+  }
+  throw err
+})
+
 const io = new Server(httpServer, {
   cors: {
     origin: CLIENT_ORIGIN,

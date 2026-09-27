@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import Sidebar from '../components/Sidebar'
 import ChatWindow from '../components/ChatWindow'
 import MessageInput from '../components/MessageInput'
+import ConnectionBanner from '../components/ConnectionBanner'
 import { useAuth } from '../context/useAuth'
 import { api } from '../lib/api'
 import { getSocket } from '../lib/socket'
@@ -183,6 +184,7 @@ export default function ChatPage() {
         unread={unread}
       />
       <main className="flex min-w-0 flex-1 flex-col">
+        {!connected && <ConnectionBanner connected={connected} />}
         <ChatWindow
           room={activeRoom}
           user={user}

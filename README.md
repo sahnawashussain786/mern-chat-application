@@ -131,6 +131,26 @@ server verifies against Clerk's JWKS — no passwords or sessions live in your D
 
 ## 📜 Scripts
 
+### From the project root (recommended)
+
+Run once first — installs the root `concurrently` dependency:
+
+```bash
+npm install
+```
+
+| Script               | Purpose                                        |
+| -------------------- | ---------------------------------------------- |
+| `npm run dev`        | Start **server + client together** (one window, prefixed `[server]` / `[client]` logs) |
+| `npm run server`     | Start only the API server                      |
+| `npm run client`     | Start only the Vite client                     |
+| `npm run install:all`| Install root + server + client dependencies    |
+| `npm run build`      | Production build of the client                 |
+| `start.bat`          | Windows: checks env/Mongo/deps, launches everything, health-checks the API |
+| `start.bat check`    | Windows: verify setup only, start nothing      |
+
+### From inside `server/` or `client/`
+
 | Location | Script         | Purpose                  |
 | -------- | -------------- | ------------------------ |
 | `server` | `npm run dev`  | Server with auto-reload  |
