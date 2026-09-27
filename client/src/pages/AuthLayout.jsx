@@ -1,5 +1,3 @@
-import { useEffect, useState } from 'react'
-
 function Logo() {
   return (
     <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/20 ring-1 ring-white/30 backdrop-blur">
@@ -15,9 +13,6 @@ function Dot() {
 }
 
 export default function AuthLayout({ children }) {
-  const [mounted, setMounted] = useState(false)
-  useEffect(() => setMounted(true), [])
-
   return (
     <div className="grid min-h-full lg:grid-cols-2">
       {/* Branding panel */}
@@ -30,7 +25,7 @@ export default function AuthLayout({ children }) {
           <span className="text-lg font-bold text-white">ChatFlow</span>
         </div>
 
-        <div className={`relative z-10 transition-all duration-700 ${mounted ? 'translate-y-0 opacity-100' : 'translate-y-6 opacity-0'}`}>
+        <div className="relative z-10 animate-[fadeUp_.7s_ease-out_both]">
           <h1 className="text-4xl font-bold leading-tight text-white">
             Conversations that
             <br />
@@ -52,7 +47,7 @@ export default function AuthLayout({ children }) {
 
       {/* Auth panel */}
       <div className="flex items-center justify-center p-6 sm:p-12">
-        <div className={`w-full max-w-md transition-all duration-700 ${mounted ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'}`}>
+        <div className="w-full max-w-md animate-[fadeUp_.7s_ease-out_both]">
           {children}
         </div>
       </div>

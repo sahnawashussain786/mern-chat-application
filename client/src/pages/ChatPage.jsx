@@ -14,7 +14,9 @@ export default function ChatPage() {
   const [activeRoom, setActiveRoom] = useState(null)
   const [messages, setMessages] = useState([])
   const [onlineUsers, setOnlineUsers] = useState([])
-  const [typing, setTyping] = useState([]) // [{ id, displayName, at }]
+  const [typing, setTyping] = useState([])
+  const [unread, setUnread] = useState({}) // roomId → count
+  const [replyTo, setReplyTo] = useState(null)
   const [connected, setConnected] = useState(false)
   const activeRoomRef = useRef(null)
   const socketRef = useRef(null)
@@ -23,7 +25,21 @@ export default function ChatPage() {
     activeRoomRef.current = activeRoom
   }, [activeRoom])
 
-  // Load rooms once
+  const bumpUnread = useCallback((roomId) => {
+    if (roomId === activeRoomRef.current?.id) return
+    setUnread((prev) => ({ ...prev, [roomId]: (prev[roomId] ?? 0) + 1 }))
+  }, [])
+
+  const clearUnread = useCallback((roomId) => {
+    setUnread((prev) => {
+      if (!prev[roomId]) return prev
+      const next = { ...prev }
+      delete next[roomId]
+      return next
+    })
+  }, [])
+
+  // Load rooms
   useEffect(() => {
     api
       .rooms()
@@ -34,7 +50,7 @@ export default function ChatPage() {
       .catch(() => {})
   }, [])
 
-  // Socket lifecycle: connect after auth
+  // Socket lifecycle
   useEffect(() => {
     if (!user) return
     const socket = getSocket()
@@ -42,10 +58,6 @@ export default function ChatPage() {
 
     const onConnect = () => setConnected(true)
     const onDisconnect = () => setConnected(false)
-    const onConnectError = (err) => {
-      console.warn('socket error:', err.message)
-      setConnected(false)
-    }
 
     const onPresence = ({ online }) => setOnlineUsers(online)
 
@@ -55,7 +67,13 @@ export default function ChatPage() {
           if (prev.some((m) => m.id === message.id)) return prev
           return [...prev, message]
         })
+      } else {
+        bumpUnread(message.roomId)
       }
+    }
+
+    const onMessageUpdated = ({ message }) => {
+      setMessages((prev) => prev.map((m) => (m.id === message.id ? message : m)))
     }
 
     const onTyping = ({ user: typingUser, isTyping }) => {
@@ -69,9 +87,9 @@ export default function ChatPage() {
 
     socket.on('connect', onConnect)
     socket.on('disconnect', onDisconnect)
-    socket.on('connect_error', onConnectError)
     socket.on('presence:state', onPresence)
     socket.on('message:new', onMessageNew)
+    socket.on('message:updated', onMessageUpdated)
     socket.on('typing', onTyping)
 
     socket.connect()
@@ -79,15 +97,15 @@ export default function ChatPage() {
     return () => {
       socket.off('connect', onConnect)
       socket.off('disconnect', onDisconnect)
-      socket.off('connect_error', onConnectError)
       socket.off('presence:state', onPresence)
       socket.off('message:new', onMessageNew)
+      socket.off('message:updated', onMessageUpdated)
       socket.off('typing', onTyping)
       socket.disconnect()
     }
-  }, [user])
+  }, [user, bumpUnread, clearUnread])
 
-  // Expire stale typing indicators
+  // Expire typing indicators
   useEffect(() => {
     if (typing.length === 0) return
     const timer = setInterval(() => {
@@ -104,22 +122,42 @@ export default function ChatPage() {
     }
   }, [])
 
-  const handleSend = useCallback(async (text) => {
-    const socket = socketRef.current
-    const room = activeRoomRef.current
-    if (!socket?.connected || !room) throw new Error('Not connected')
-    socket.emit('message:send', { roomId: room.id, body: text }, (res) => {
-      if (res?.error) throw new Error(res.error)
+  const handleSend = useCallback(async (payload) => {
+    return new Promise((resolve, reject) => {
+      const socket = socketRef.current
+      const room = activeRoomRef.current
+      if (!socket?.connected || !room) return reject(new Error('Not connected'))
+      socket.emit('message:send', { roomId: room.id, ...payload }, (res) => {
+        if (res?.error) return reject(new Error(res.error))
+        resolve(res.message)
+      })
     })
   }, [])
 
-  const joinRoom = useCallback((room) => {
-    setActiveRoom(room)
-    setMessages([])
-    setTyping([])
+  const joinRoom = useCallback(
+    (room) => {
+      setActiveRoom(room)
+      setMessages([])
+      setTyping([])
+      setReplyTo(null)
+      clearUnread(room.id)
+    },
+    [clearUnread],
+  )
+
+  const handleReact = useCallback((m, emoji) => {
+    socketRef.current?.emit('message:react', { messageId: m.id, emoji })
   }, [])
 
-  // Join the active room on the socket whenever it or connection state changes
+  const handleEdit = useCallback((m, body) => {
+    socketRef.current?.emit('message:edit', { messageId: m.id, body })
+  }, [])
+
+  const handleDelete = useCallback((m) => {
+    socketRef.current?.emit('message:delete', { messageId: m.id })
+  }, [])
+
+  // Join the active room whenever it or the connection changes
   useEffect(() => {
     const socket = socketRef.current
     if (socket?.connected && activeRoom) {
@@ -136,10 +174,13 @@ export default function ChatPage() {
         activeRoom={activeRoom}
         onJoinRoom={joinRoom}
         onCreateRoom={(room) => {
-          setRooms((prev) => [...prev, room].sort((a, b) => a.name.localeCompare(b.name)))
+          setRooms((prev) =>
+            [...prev, room].sort((a, b) => Number(b.isPrivate) - Number(a.isPrivate) || a.name.localeCompare(b.name)),
+          )
           joinRoom(room)
         }}
         onlineUsers={onlineUsers}
+        unread={unread}
       />
       <main className="flex min-w-0 flex-1 flex-col">
         <ChatWindow
@@ -148,8 +189,18 @@ export default function ChatPage() {
           messages={messages}
           setMessages={setMessages}
           typingUsers={typing}
+          onReply={setReplyTo}
+          onReact={handleReact}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
         />
-        <MessageInput onSend={handleSend} onTyping={handleTyping} disabled={!activeRoom} />
+        <MessageInput
+          onSend={handleSend}
+          onTyping={handleTyping}
+          disabled={!activeRoom}
+          replyTo={replyTo}
+          onCancelReply={() => setReplyTo(null)}
+        />
       </main>
     </div>
   )

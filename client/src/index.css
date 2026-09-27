@@ -2,6 +2,17 @@
 
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --animate-pop: pop 0.18s ease-out;
+  --animate-float: float 3s ease-in-out infinite;
+
+  @keyframes pop {
+    0% { opacity: 0; transform: scale(0.92) translateY(4px); }
+    100% { opacity: 1; transform: scale(1) translateY(0); }
+  }
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
+  }
 }
 
 html,
@@ -12,4 +23,81 @@ body,
 
 body {
   @apply bg-slate-950 text-slate-100 antialiased;
+}
+
+/* Chat background with subtle grid + glow */
+#root {
+  background:
+    radial-gradient(ellipse 80% 50% at 20% -10%, rgba(99, 102, 241, 0.13), transparent),
+    radial-gradient(ellipse 80% 50% at 80% 110%, rgba(217, 70, 239, 0.1), transparent);
+}
+
+/* Loader orb */
+.loader-orb {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 9999px;
+  background: conic-gradient(from 0deg, #6366f1, #a855f7, #ec4899, #6366f1);
+  mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 4px));
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 4px));
+  animation: spin 0.9s linear infinite;
+}
+
+/* Typing dots */
+.typing-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 9999px;
+  background: #818cf8;
+  display: inline-block;
+  animation: typingBounce 1.2s ease-in-out infinite;
+}
+
+@keyframes typingBounce {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+  30% { transform: translateY(-4px); opacity: 1; }
+}
+
+/* Glow blobs on auth page */
+.glow-blob {
+  border-radius: 9999px;
+  filter: blur(60px);
+  animation: drift 14s ease-in-out infinite alternate;
+}
+
+@keyframes drift {
+  0% { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(40px, 30px) scale(1.15); }
+}
+
+/* Auth page entrance */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* New message entrance */
+@keyframes msgIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.animate-pop {
+  animation: pop 0.18s ease-out;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.2);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.35);
 }

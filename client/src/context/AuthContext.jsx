@@ -6,10 +6,10 @@ import { registerTokenGetter } from '../lib/clerk'
 
 const AuthContext = createContext(null)
 
+// user states: undefined = syncing, null = signed out, object = loaded
 export function AuthProvider({ children }) {
   const { getToken, isLoaded, isSignedIn, userId } = useClerkAuth()
-  const [user, setUser] = useState(null)
-  const [syncing, setSyncing] = useState(true)
+  const [clerkUser, setClerkUser] = useState(undefined)
 
   // Register the Clerk token getter for api + socket modules
   useEffect(() => {
@@ -18,25 +18,16 @@ export function AuthProvider({ children }) {
 
   // Sync the Clerk user into our Mongo user record
   useEffect(() => {
-    if (!isLoaded) return
-    if (!isSignedIn) {
-      setUser(null)
-      setSyncing(false)
-      return
-    }
+    if (!isLoaded || !isSignedIn || !userId) return
 
     let cancelled = false
-    setSyncing(true)
     api
       .me()
       .then((data) => {
-        if (!cancelled) setUser(data.user)
+        if (!cancelled) setClerkUser(data.user)
       })
       .catch(() => {
-        if (!cancelled) setUser(null)
-      })
-      .finally(() => {
-        if (!cancelled) setSyncing(false)
+        if (!cancelled) setClerkUser(null)
       })
 
     return () => {
@@ -44,21 +35,22 @@ export function AuthProvider({ children }) {
     }
   }, [isLoaded, isSignedIn, userId])
 
-  const logout = useCallback(async () => {
+  const logout = useCallback(() => {
     disconnectSocket()
-    setUser(null)
   }, [])
 
   const value = useMemo(
     () => ({
-      user,
-      loading: !isLoaded || syncing,
-      isSignedIn,
+      user: isSignedIn ? (clerkUser ?? null) : null,
+      loading: !isLoaded || (Boolean(isSignedIn) && clerkUser === undefined),
+      isSignedIn: Boolean(isSignedIn),
       clerkUserId: userId,
       logout,
     }),
-    [user, isLoaded, syncing, isSignedIn, userId, logout],
+    [clerkUser, isLoaded, isSignedIn, userId, logout],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
+
+export { AuthContext }

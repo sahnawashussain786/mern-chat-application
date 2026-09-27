@@ -1,9 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import MessageItem from './MessageItem'
 import { api } from '../lib/api'
-
-function formatTime(ts) {
-  return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-}
 
 function dayLabel(ts) {
   const d = new Date(ts)
@@ -16,23 +13,33 @@ function dayLabel(ts) {
   return d.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' })
 }
 
-export default function ChatWindow({ room, user, messages, setMessages, typingUsers }) {
+export default function ChatWindow({
+  room,
+  user,
+  messages,
+  setMessages,
+  typingUsers,
+  onReply,
+  onReact,
+  onEdit,
+  onDelete,
+}) {
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMore, setHasMore] = useState(false)
   const bottomRef = useRef(null)
   const lastMsgId = messages.length > 0 ? messages[messages.length - 1].id : null
 
-  const scrollToBottom = useCallback((behavior = 'smooth') => {
-    bottomRef.current?.scrollIntoView({ behavior, block: 'end' })
-  }, [])
-
-  // Scroll to bottom when the latest message changes (new message or room switch).
-  // Prepending older messages leaves lastMsgId unchanged, so position is preserved.
+  // Scroll when the latest message changes; prepends don't move the viewport
   useEffect(() => {
-    if (lastMsgId) scrollToBottom('smooth')
-  }, [lastMsgId, scrollToBottom])
+    if (lastMsgId) bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+  }, [lastMsgId])
 
-  // Load history when a room is selected
+  // Jump instantly on room switch
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ block: 'end' })
+  }, [room?.id])
+
+  // Load history on room change
   useEffect(() => {
     if (!room) return
     let cancelled = false
@@ -44,9 +51,7 @@ export default function ChatWindow({ room, user, messages, setMessages, typingUs
         setHasMore(data.hasMore)
       })
       .catch(() => {
-        if (cancelled) return
-        setMessages([])
-        setHasMore(false)
+        if (!cancelled) setMessages([])
       })
     return () => {
       cancelled = true
@@ -62,7 +67,7 @@ export default function ChatWindow({ room, user, messages, setMessages, typingUs
       setHasMore(data.hasMore)
       setMessages((prev) => [...data.messages, ...prev])
     } catch {
-      // keep current list
+      // keep list
     } finally {
       setLoadingMore(false)
     }
@@ -84,7 +89,7 @@ export default function ChatWindow({ room, user, messages, setMessages, typingUs
     )
   }
 
-  // Group consecutive messages by sender + day
+  // Group consecutive messages by sender within the same day
   const groups = []
   for (const m of messages) {
     const last = groups[groups.length - 1]
@@ -100,15 +105,23 @@ export default function ChatWindow({ room, user, messages, setMessages, typingUs
     <div className="flex min-h-0 flex-1 flex-col">
       {/* Room header */}
       <header className="flex items-center gap-3 border-b border-white/5 bg-slate-900/40 px-6 py-3.5 backdrop-blur">
-        <span className="text-xl font-semibold text-slate-500">#</span>
-        <div className="min-w-0">
+        <span className="text-xl font-bold text-indigo-400">#</span>
+        <div className="min-w-0 flex-1">
           <h2 className="truncate text-sm font-semibold text-white">{room.name}</h2>
           {room.topic && <p className="truncate text-xs text-slate-500">{room.topic}</p>}
         </div>
+        {room.isPrivate && (
+          <span className="flex items-center gap-1 rounded-full bg-amber-500/10 px-2.5 py-1 text-[11px] font-medium text-amber-300 ring-1 ring-amber-400/20">
+            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+            </svg>
+            Private
+          </span>
+        )}
       </header>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4">
+      <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
         {hasMore && (
           <div className="mb-4 text-center">
             <button
@@ -124,7 +137,7 @@ export default function ChatWindow({ room, user, messages, setMessages, typingUs
 
         {messages.length === 0 && (
           <div className="flex h-full flex-col items-center justify-center text-center">
-            <p className="text-4xl">👋</p>
+            <p className="animate-float text-5xl">👋</p>
             <p className="mt-3 text-sm text-slate-400">
               This is the start of <span className="font-semibold text-slate-200">#{room.name}</span>
             </p>
@@ -136,47 +149,24 @@ export default function ChatWindow({ room, user, messages, setMessages, typingUs
           <div key={group.ts + group.senderId}>
             <div className="my-4 flex items-center gap-3">
               <div className="h-px flex-1 bg-white/5" />
-              <span className="text-[11px] font-medium uppercase tracking-wide text-slate-600">{dayLabel(group.ts)}</span>
+              <span className="text-[11px] font-medium uppercase tracking-wide text-slate-600">
+                {dayLabel(group.ts)}
+              </span>
               <div className="h-px flex-1 bg-white/5" />
             </div>
-            {group.items.map((m, idx) => {
-              const mine = m.sender.id === user.id
-              const first = idx === 0
-              return (
-                <div key={m.id} className={`flex gap-3 ${mine ? 'flex-row-reverse' : ''} ${first ? 'mt-3' : 'mt-0.5'}`}>
-                  <div className="w-9 shrink-0">
-                    {first && (
-                      <div
-                        className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold text-white ${
-                          mine ? 'bg-gradient-to-br from-indigo-500 to-violet-600' : 'bg-gradient-to-br from-slate-600 to-slate-700'
-                        }`}
-                      >
-                        {m.sender.displayName.charAt(0).toUpperCase()}
-                      </div>
-                    )}
-                  </div>
-                  <div className={`max-w-[75%] ${mine ? 'items-end text-right' : ''}`}>
-                    {first && (
-                      <div className={`mb-1 flex items-baseline gap-2 ${mine ? 'flex-row-reverse' : ''}`}>
-                        <span className="text-sm font-semibold text-slate-200">
-                          {mine ? 'You' : m.sender.displayName}
-                        </span>
-                        <span className="text-[11px] text-slate-500">{formatTime(m.createdAt)}</span>
-                      </div>
-                    )}
-                    <div
-                      className={`inline-block whitespace-pre-wrap break-words rounded-2xl px-3.5 py-2 text-sm leading-relaxed ${
-                        mine
-                          ? 'bg-indigo-500 text-white rounded-br-sm'
-                          : 'bg-slate-800 text-slate-100 rounded-bl-sm'
-                      }`}
-                    >
-                      {m.body}
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
+            {group.items.map((m, idx) => (
+              <MessageItem
+                key={m.id}
+                m={m}
+                user={user}
+                mine={m.sender.id === user.id}
+                isGroupFirst={idx === 0}
+                onReply={onReply}
+                onReact={onReact}
+                onEdit={onEdit}
+                onDelete={onDelete}
+              />
+            ))}
           </div>
         ))}
         <div ref={bottomRef} />
@@ -185,11 +175,15 @@ export default function ChatWindow({ room, user, messages, setMessages, typingUs
       {/* Typing indicator */}
       <div className="h-6 px-6">
         {typingUsers.length > 0 && (
-          <p className="text-xs text-slate-500">
+          <p className="flex items-center gap-1.5 text-xs text-slate-400">
+            <span className="flex gap-0.5">
+              <span className="typing-dot" />
+              <span className="typing-dot" style={{ animationDelay: '0.15s' }} />
+              <span className="typing-dot" style={{ animationDelay: '0.3s' }} />
+            </span>
             {typingUsers.length === 1
               ? `${typingUsers[0].displayName} is typing`
               : `${typingUsers.map((u) => u.displayName).join(', ')} are typing`}
-            <span className="animate-pulse">…</span>
           </p>
         )}
       </div>
