@@ -8,9 +8,11 @@ function intEnv(name, fallback) {
 
 export const PORT = intEnv('PORT', 5000)
 export const MONGODB_URI = process.env.MONGODB_URI || ''
-export const JWT_SECRET = process.env.JWT_SECRET || 'dev-only-insecure-secret-change-me'
-export const JWT_EXPIRES_IN_DAYS = intEnv('JWT_EXPIRES_IN_DAYS', 7)
 export const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || 'http://localhost:5173'
 
-export const COOKIE_NAME = 'chat_token'
+// Clerk
+export const CLERK_SECRET_KEY = process.env.CLERK_SECRET_KEY || ''
+export const CLERK_PUBLISHABLE_KEY = process.env.CLERK_PUBLISHABLE_KEY || ''
+export const CLERK_WEBHOOK_SECRET = process.env.CLERK_WEBHOOK_SECRET || ''
+
 export const isProd = process.env.NODE_ENV === 'production'

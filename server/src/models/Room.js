@@ -12,16 +12,10 @@ const roomSchema = new mongoose.Schema(
       maxlength: 32,
       match: /^[a-z0-9-]+$/,
     },
-    topic: {
-      type: String,
-      trim: true,
-      maxlength: 80,
-      default: '',
-    },
-    createdBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
-    },
+    topic: { type: String, trim: true, maxlength: 80, default: '' },
+    isPrivate: { type: Boolean, default: false },
+    members: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   },
   { timestamps: true },
 )
@@ -31,6 +25,8 @@ roomSchema.methods.toSafeJSON = function toSafeJSON() {
     id: this._id.toString(),
     name: this.name,
     topic: this.topic,
+    isPrivate: this.isPrivate,
+    memberCount: this.members?.length ?? 0,
   }
 }
 

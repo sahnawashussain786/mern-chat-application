@@ -1,60 +1,42 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { SignIn, SignUp } from '@clerk/react'
 import { AuthProvider } from './context/AuthContext'
 import { useAuth } from './context/useAuth'
-import AuthPage from './pages/AuthPage'
+import AuthLayout from './pages/AuthLayout.jsx'
 import ChatPage from './pages/ChatPage'
 
-function ProtectedRoute({ children }) {
-  const { user, loading } = useAuth()
-
-  if (loading) {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />
-        <span className="ml-3 text-sm text-slate-400">Loading…</span>
-      </div>
-    )
-  }
-
-  return user ? children : <Navigate to="/login" replace />
+function Loader() {
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-4">
+      <div className="loader-orb" />
+      <p className="text-sm text-slate-400">Loading…</p>
+    </div>
+  )
 }
 
-function PublicOnlyRoute({ children }) {
-  const { user, loading } = useAuth()
-  if (loading) {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <div className="h-8 w-8 animate-spin border-2 border-indigo-500 border-t-transparent rounded-full" />
-      </div>
-    )
-  }
-  return user ? <Navigate to="/" replace /> : children
+function Protected({ children }) {
+  const { isSignedIn, loading } = useAuth()
+  if (loading) return <Loader />
+  return isSignedIn ? children : <Navigate to="/login" replace />
+}
+
+function PublicOnly({ children }) {
+  const { isSignedIn, loading } = useAuth()
+  if (loading) return <Loader />
+  return isSignedIn ? <Navigate to="/" replace /> : children
 }
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <AuthProvider>
+    <AuthProvider>
+      <BrowserRouter>
         <Routes>
-          <Route
-            path="/login"
-            element={
-              <PublicOnlyRoute>
-                <AuthPage />
-              </PublicOnlyRoute>
-            }
-          />
-          <Route
-            path="/"
-            element={
-              <ProtectedRoute>
-                <ChatPage />
-              </ProtectedRoute>
-            }
-          />
+          <Route path="/login" element={<PublicOnly><AuthLayout><SignIn routing="virtual" /></AuthLayout></PublicOnly>} />
+          <Route path="/register" element={<PublicOnly><AuthLayout><SignUp routing="virtual" /></AuthLayout></PublicOnly>} />
+          <Route path="/" element={<Protected><ChatPage /></Protected>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
-      </AuthProvider>
-    </BrowserRouter>
+      </BrowserRouter>
+    </AuthProvider>
   )
 }
